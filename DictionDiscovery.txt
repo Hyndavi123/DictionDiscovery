@@ -1,0 +1,153 @@
+#cell_1
+pip install librosa soundfile numpy sklearn
+
+
+#cell_2
+pip install playsound
+
+
+#cell_3
+pip install sounddevice
+
+
+#cell_4
+pip install pySound
+
+
+#cell_5
+!pip install SpeechRecognition
+
+
+#cell_6
+import sys
+!pip install google-cloud-speech
+
+
+#cell_7
+import librosa
+import soundfile
+import os, glob, pickle
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import accuracy_score
+
+
+#cell_8
+def extract_feature(file_name, mfcc, chroma, mel):
+    with soundfile.SoundFile(file_name) as sound_file:
+        X = sound_file.read(dtype="float32")
+        sample_rate=sound_file.samplerate
+        if chroma:
+            stft=np.abs(librosa.stft(X))
+        result=np.array([])
+        if mfcc:
+            mfccs=np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T, axis=0)
+            result=np.hstack((result, mfccs))
+        if chroma:
+            chroma=np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)
+            result=np.hstack((result, chroma))
+        if mel:
+            mel=np.mean(librosa.feature.melspectrogram(X, sr=sample_rate).T,axis=0)
+            result=np.hstack((result, mel))
+    return result
+
+
+#cell_9
+emotions={'01':'neutral','02':'calm','03':'happy','04':'sad','05':'angry','06':'fearful','07':'disgust','08':'surprised'}
+observed_emotions=['calm', 'happy', 'fearful', 'disgust']
+
+
+#cell_10
+from google.colab import files
+uploaded = files.upload()
+
+
+#cell_11
+!unzip /content/speech-emotion-recognition-ravdess-data.zip
+
+
+#cell_12
+import glob
+images = glob.glob("/content/Actor_*/*.wav")
+
+
+#cell_13
+def load_data(test_size=0.2):
+    x,y=[],[]
+    for file in glob.glob("/content/Actor_*/*.wav"):
+        file_name=os.path.basename(file)
+        emotion=emotions[file_name.split("-")[2]]
+        if emotion not in observed_emotions:
+            continue
+        feature=extract_feature(file, mfcc=True, chroma=True, mel=True)
+        x.append(feature)
+        y.append(emotion)
+    return train_test_split(np.array(x), y, test_size=test_size, random_state=9)
+
+
+#cell_14
+x_train,x_test,y_train,y_test=load_data(test_size=0.25)
+
+
+#cell_15
+print((x_train.shape[0], x_test.shape[0]))
+
+
+#cell_16
+print(f'Features extracted: {x_train.shape[1]}')
+
+
+#cell_17
+model=MLPClassifier(alpha=0.01, batch_size=256, epsilon=1e-08, hidden_layer_sizes=(300,), learning_rate='adaptive', max_iter=500)
+
+
+#cell_18
+model.fit(x_train,y_train)
+
+
+#cell_19
+y_pred=model.predict(x_test)
+
+
+#cell_20
+accuracy=accuracy_score(y_true=y_test, y_pred=y_pred)
+print("Accuracy: {:.2f}%".format(accuracy*100))
+
+
+#cell_21
+from sklearn.metrics import classification_report
+print(classification_report(y_test, y_pred))
+
+
+#cell_22
+pip install audio2numpy
+
+
+#cell_23
+from audio2numpy import open_audio
+from scipy.io.wavfile import read
+import os
+import time 
+from google.colab import drive
+from playsound import playsound
+def play1():
+  audio_test = open_audio('/content/Actor_24/03-01-01-01-01-01-24.wav')
+  audio_test, k = np.asarray(audio_test)
+  count = np.count_nonzero(audio_test)
+  removed = count % 180
+  audio_test = audio_test[0:(count - removed)].reshape((count // 180), 180)
+  a = model.predict(audio_test)
+  emotions_observed=['neutral', 'calm', 'happy', 'sad', 'angry', 'fearful', 'disgust', 'surprised']
+  for i in range(0, 8):
+    if a[0] in emotions_observed:
+      key = i
+  print("Enter feedback in a range of 01 to 08 : ")
+  n = int(input())
+  if(key == n):
+    print("Provide servives related to ", emotions_observed[key - 1])
+  else:
+    print("Provide services related to ", emotions_observed[n - 1], "and ", emotions_observed[key - 1])
+
+play1()
+#count = np.count_nonzero(arr)
